@@ -12,7 +12,6 @@ from pytorch3d.renderer import (
     MeshRasterizer,
     SoftPhongShader
 )
-from plot_image_grid import image_grid
 
 
 # Compute the bounding box of a mesh
@@ -23,44 +22,37 @@ def compute_bounding_box(mesh):
     return min_xyz, max_xyz
 
 
-# Generate multi-view images of a mesh
-def generate_multi_view(obj_path, num_views, image_size):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# Load the mesh from an OBJ file
+def load_mesh(obj_path, device):
+    return load_objs_as_meshes([obj_path], device=device)
 
-    # Load the mesh from the OBJ file
-    mesh = load_objs_as_meshes([obj_path], device=device)
 
-    # Compute the bounding box of the mesh
-    min_xyz, max_xyz = compute_bounding_box(mesh)
-    center = (min_xyz + max_xyz) / 2
-    size = (max_xyz - min_xyz).max()
-
-    # Generate camera poses for each view
+# Generate camera poses for each view
+def setup_cameras(num_views, size, device):
     elev = torch.linspace(0, 360, num_views)
     azim = torch.linspace(-180, 180, num_views)
     R, T = look_at_view_transform(size * 2.0, elev, azim)
-    cameras = FoVPerspectiveCameras(device=device, R=R, T=T)
+    return FoVPerspectiveCameras(device=device, R=R, T=T)
 
-    # Set up the renderer
+
+# Setup lighting
+def setup_lights(device):
+    return PointLights(device=device, location=[[0.0, 0.0, -3.0]])
+
+
+# Render the mesh from each view
+def render_mesh(mesh, cameras, lights, image_size, device):
     raster_settings = RasterizationSettings(
         image_size=image_size, blur_radius=0.0, faces_per_pixel=1
     )
-    lights = PointLights(device=device, location=[[0.0, 0.0, -3.0]])
     renderer = MeshRenderer(
         rasterizer=MeshRasterizer(cameras=cameras, raster_settings=raster_settings),
         shader=SoftPhongShader(device=device, cameras=cameras, lights=lights),
     )
-
-    # Render the mesh from each view
-    meshes = mesh.extend(num_views)
+    meshes = mesh.extend(len(cameras))
     target_images = renderer(meshes, cameras=cameras, lights=lights)
-    target_rgb = [target_images[i, ..., :3] for i in range(num_views)]
-
+    target_rgb = [target_images[i, ..., :3] for i in range(len(cameras))]
     return target_rgb
-
-    # Display the rendered images in a grid
-    # image_grid(target_images.cpu().numpy(), rows=4, cols=5, rgb=True)
-    # plt.show()
 
 
 # Save the rendered images to a directory
@@ -69,6 +61,27 @@ def save_images(images, directory):
         os.makedirs(directory)
     for i, image in enumerate(images):
         plt.imsave(os.path.join(directory, f"view_{i}.png"), image.cpu().numpy())
+
+
+def generate_multi_view(obj_path, num_views, image_size):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # Load the mesh from the OBJ file
+    mesh = load_mesh(obj_path, device)
+
+    # Compute the bounding box of the mesh
+    min_xyz, max_xyz = compute_bounding_box(mesh)
+    center = (min_xyz + max_xyz) / 2
+    size = (max_xyz - min_xyz).max()
+
+    # Setup cameras and lights
+    cameras = setup_cameras(num_views, size, device)
+    lights = setup_lights(device)
+
+    # Render the mesh
+    images = render_mesh(mesh, cameras, lights, image_size, device)
+
+    return images
 
 
 if __name__ == "__main__":
