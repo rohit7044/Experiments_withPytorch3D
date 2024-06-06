@@ -21,7 +21,7 @@ from pytorch3d.renderer import (
 # Constants for rasterization settings and optimization parameters
 SIGMA = 1e-4
 NUM_VIEWS_PER_ITERATION = 2
-N_ITER = 100
+N_ITER = 2000
 PLOT_PERIOD = 250
 
 # Optimization losses configuration
