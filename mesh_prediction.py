@@ -177,6 +177,7 @@ def refine_mesh(src_mesh, optimizer, deform_verts, num_views, silhouette_rendere
 if __name__ == "__main__":
     if len(sys.argv) != 5:
         print("Usage: python mesh_prediction.py <obj_path> <image_views> <image_size> <output_obj_path>")
+        print("Example: python mesh_prediction.py ../data/bunny.obj 4 512 ../data/bunny_refined.obj")
         sys.exit(1)
     try:
         obj_path = sys.argv[1]
